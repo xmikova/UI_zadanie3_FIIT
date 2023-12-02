@@ -1,8 +1,7 @@
 import random
 import math
-import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.neighbors import KDTree
+import heapq
+import tkinter as tk
 
 classified_data = []
 training_data = []
@@ -21,45 +20,19 @@ class Point:
 def euclidean_distance(point1, point2):
     return math.sqrt((point2.x - point1.x)**2 + (point2.y - point1.y)**2)
 
+
 def classify(x, y, k):
     global training_data
     global classified_data
 
-    for point in training_data:
-        point.distance = euclidean_distance(Point(x, y, ""), point)
+    min_distances = heapq.nsmallest(k, ((euclidean_distance(Point(x, y, ""), point), point.color) for point in
+                                        training_data))
 
-    sorted_training_data = sorted(training_data, key=lambda point: point.distance)
-
+    # Count the occurrences of each color in the k nearest neighbors
     color_counts = {'red': 0, 'green': 0, 'blue': 0, 'purple': 0}
-    for point in sorted_training_data[:k]:
-        color_counts[point.color] += 1
+    for distance, color in min_distances:
+        color_counts[color] += 1
 
-    new_color = max(color_counts, key=color_counts.get)
-    classified_data.append(Point(x, y, new_color))
-    training_data.append(Point(x, y, new_color))
-
-    return new_color
-
-def classify_kdtree(x, y, k):
-    global training_data
-    global classified_data
-
-    # Convert training_data to a numpy array for KD-tree
-    training_array = np.array([(point.x, point.y) for point in training_data])
-
-    # Create a KD-tree using the training data
-    tree = KDTree(training_array)
-
-    # Query the KD-tree to find the k nearest neighbors
-    _, indices = tree.query([(x, y)], k=k)
-    neighbors = [training_data[i] for i in indices[0]]
-
-    # Count the occurrences of each color in the neighbors
-    color_counts = {'red': 0, 'green': 0, 'blue': 0, 'purple': 0}
-    for neighbor in neighbors:
-        color_counts[neighbor.color] += 1
-
-    # Determine the most common color
     new_color = max(color_counts, key=color_counts.get)
     classified_data.append(Point(x, y, new_color))
     training_data.append(Point(x, y, new_color))
@@ -84,7 +57,7 @@ def generate_points(number_of_points_per_color):
     for color in colors:
         for _ in range(number_of_points_per_color):
             if color == 'red':
-                if random.randint(1,100) > 1:
+                if random.randint(1, 100) > 1:
                     x = random.randint(-5000, 500)
                     y = random.randint(-5000, 500)
                 else:
@@ -97,7 +70,7 @@ def generate_points(number_of_points_per_color):
                     unique_point = point
                 red.append(unique_point)
             elif color == 'green':
-                if random.randint(1,100) > 1:
+                if random.randint(1, 100) > 1:
                     x = random.randint(-500, 5000)
                     y = random.randint(-5000, 500)
                 else:
@@ -110,7 +83,7 @@ def generate_points(number_of_points_per_color):
                     unique_point = point
                 green.append(unique_point)
             elif color == 'blue':
-                if random.randint(1,100) > 1:
+                if random.randint(1, 100) > 1:
                     x = random.randint(-5000, 500)
                     y = random.randint(-500, 5000)
                 else:
@@ -123,7 +96,7 @@ def generate_points(number_of_points_per_color):
                     unique_point = point
                 blue.append(unique_point)
             else:
-                if random.randint(1,100) > 1:
+                if random.randint(1, 100) > 1:
                     x = random.randint(-500, 5000)
                     y = random.randint(-500, 5000)
                 else:
@@ -136,11 +109,7 @@ def generate_points(number_of_points_per_color):
                     unique_point = point
                 purple.append(unique_point)
 
-NUMBER = 100
-generate_points(NUMBER)
-
-
-def classify_point(choice, color, color_count, color_list, color_index):
+def classify_point(color, color_count, color_list, color_index, k):
     global errors
 
     if color_count < len(color_list[color_index]):
@@ -148,40 +117,62 @@ def classify_point(choice, color, color_count, color_list, color_index):
         x, y = point.x, point.y
         color_count += 1
 
-        if choice == "kdtree":
-            new_color = classify_kdtree(x, y, k)
-        else:
-            new_color = classify(x, y, k)
+        new_color = classify(x, y, k)
 
         if new_color != color:
             errors += 1
 
     return color_count
 
+def plot_points(classified_data):
+    root = tk.Tk()
+    canvas_width = 800
+    canvas_height = 800
+    canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
+    canvas.pack()
 
-k_values = [1, 3, 7, 15]
+    # Find the range of x and y coordinates
+    min_x = min(point.x for point in classified_data)
+    max_x = max(point.x for point in classified_data)
+    min_y = min(point.y for point in classified_data)
+    max_y = max(point.y for point in classified_data)
+
+    # Calculate the scale factors for x and y
+    scale_factor_x = canvas_width / (max_x - min_x)
+    scale_factor_y = canvas_height / (max_y - min_y)
+
+    for point in classified_data:
+        x, y, color = point.x, point.y, point.color
+
+        # Scale down the coordinates for visibility
+        x_scaled = (x - min_x) * scale_factor_x
+        y_scaled = (y - min_y) * scale_factor_y
+
+        # Adjust the size and position of the ovals
+        oval_size = 20
+        canvas.create_oval(x_scaled - oval_size, y_scaled - oval_size, x_scaled + oval_size, y_scaled + oval_size, fill=color, outline=color)
+
+    root.mainloop()
 
 if __name__ == "__main__":
-    for k in k_values:
-        choice = "kdtree"
-        errors = 0
-        training_data = [Point(x, y, color) for color, coordinates in starting_points.items() for x, y in coordinates]
-        classified_data = [Point(x, y, color) for color, coordinates in starting_points.items() for x, y in coordinates]
+    NUMBER = 10000
+    generate_points(NUMBER)
+    print("generated")
 
-        color_counts = {'red': 0, 'green': 0, 'blue': 0, 'purple': 0}
-        color_list = {'red': red, 'green': green, 'blue': blue, 'purple': purple}
+    for i in range(4):
+        k_values = [1, 3, 7, 15]
+        for k in k_values:
+            errors = 0
+            training_data = [Point(x, y, color) for color, coordinates in starting_points.items() for x, y in coordinates]
+            classified_data = [Point(x, y, color) for color, coordinates in starting_points.items() for x, y in coordinates]
 
-        while not all(count == NUMBER for count in color_counts.values()):
-            color = random.choice(['red', 'green', 'blue', 'purple'])
-            color_counts[color] = classify_point(choice, color, color_counts[color], color_list, color)
+            color_counts = {'red': 0, 'green': 0, 'blue': 0, 'purple': 0}
+            color_list = {'red': red, 'green': green, 'blue': blue, 'purple': purple}
 
-        print("Errors for k =", k, ":", errors)
+            while not all(count == NUMBER for count in color_counts.values()):
+                color = random.choice(['red', 'green', 'blue', 'purple'])
+                color_counts[color] = classify_point(color, color_counts[color], color_list, color, k)
 
-        plt.figure(figsize=(10, 10))
-        for point in classified_data:
-            plt.scatter(point.x, point.y, c=point.color, marker='o', s=500)
-
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.show()
-
+            print("Errors for k =", k, ":", errors)
+            print(len(classified_data))
+            plot_points(classified_data)
